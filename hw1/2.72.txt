@@ -1,0 +1,15 @@
+/* Copy integer into buffer if space is available */
+/* WARNING: The following code is buggy */
+  
+void copy_int(int val, void *buf, int maxbytes) {
+     if (maxbytes - sizeof(val) >= 0) 
+     	memcpy(buf, (void *) &val, sizeof(val));
+}
+
+A. The conditional test in the code will always succeed because of maxbytes - sizeof(val) will always be greater than zero. sizeof() returns type size_t which is an unsigned int. So the operation is between one unsigned int and one signed int, which defaults to type unsigned, so the result will be always be unsigned and positive. 
+
+B. 
+void copy_int(int val, void *buf, int maxbytes) {
+     if (maxbytes - (int) sizeof(val) >= 0)
+     	memcpy(buf, (void *) &val, sizeof(val));
+}

@@ -1,0 +1,45 @@
+#define R 3
+#define S 19
+#define T 2
+
+int A[R][S][T];
+
+int
+ele (long i, long j, long k)
+{
+  return A[R - i][1 - j][k - 1];
+}
+
+/*
+1)
+In general, for an array declared as: 
+    T D[R][C]
+array element D[i][j] is at memory address:
+    &D[i][j] = Xd + L(C * i + j)
+where L is the size of data type T in bytes
+We can extend this equation to work for a 3 dimensional array as well.
+This equation become &D[i][j][k] = Xd + L(STi + Tj + k) for an array declared
+as T D[R][S][T]. 
+Xd is the starting position as before. the j dimension is multiplied by the
+S and T arrays because you must traverse every element of an S and T array to
+traverse one position in the R array. Similarly, the j position gets multiplied
+by T and then you traverse k elements in the 3rd array. Then, the i, j, and k
+terms must be multiplied by L, the size an individual element in the array.
+This yields the final equatino: Xd + L(STi + Tj + k).
+
+
+        .cfi_startproc
+        movl    $3, %eax                 eax  = 3
+        subq    %rdi, %rax               rax  = 3 - i
+        leaq    (%rax,%rax,8), %rcx      rcx = (3 - i) + 8(3 - i) ==> 9(3 -i)
+        leaq    (%rax,%rcx,2), %rax      rax = (3 - i) + 2(9(3 - i) ==> 19(3 - i)
+        subq    %rsi, %rax               rax = 19(3 - i) - j 
+        leaq    1(%rdx,%rax,2), %rax     rax = 1 + k + 2(19(3 - i) -j)
+        movl    A(,%rax,4), %eax         eax = A + 4(1 + k + 2(19(3 - i) - j))
+        ret
+
+
+
+
+*/
+

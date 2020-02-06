@@ -1,0 +1,14 @@
+One more thing. C18 allows declarations to have an alignment specifier. For example, 'int _Alignas (8) n;' acts just like 'int n;', except that it arranges for n's alignment to be 8 instead of the default int alignment of 4. Assuming the x86-64, what value does the C expression 
+'sizeof (struct { short a; char _Alignas (8) b; char c; })' 
+return and why? and why and how does your answer change if you change 'struct' to 'union' in the question?
+ 
+The expression will return 16. short a takes two bytes, then you must add 6 bytes of padding to align b to
+a multiple of 8. Then comes c which has alignment of 1. There must be 6 bytes of padding at the end to
+align the entire struct to 16 which is a multiple of 8. (the strictest alignment in the struct)
+2 bytes(a) + 6 bytes(padding) + 1 byte(b) + 1 byte(c) + 6 bytes(padding) = 16 bytes
+
+If you change the expression to union, sizeof will now return 8 because the elements a, b, and c are 
+placed on top of eachother in memory and then the entire thing must be padded to 8.
+2 bytes (a):
+1 byte (b) : 6 bytes(padding) = 8 bytes
+1 byte (c) :

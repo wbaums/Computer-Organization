@@ -1,0 +1,7 @@
+William Baumbacher
+Pexex lab log
+
+I begin by running a command to see how emacs can multiply numbers with shell commands:
+  $ emacs -Q -batch -eval '(print (* 1250284240 -1844255039))'
+Which prints:
+2305843008625102544

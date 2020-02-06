@@ -1,0 +1,46 @@
+
+(a) C code
+
+# include <alloca.h>
+
+  long aframe(long n, long idx, long *q) {
+       long i;
+       long **p = alloca(n * sizeof(long *));
+       p[0] = &i;
+       for (i = 1; i < n; i++)
+       	   p[i] = q;
+       return *p[idx];
+}
+
+(b) Portions of generated assembly code
+
+long aframe(long n, long idx, long *q)
+n in %rdi, idx in %rsi, q in %rdx
+1    	aframe:
+2	pushq	%rbp	// push rbp onto stack, rsp -= 8
+3 	movq	%rsp, %rbp // sets rbp to the position of its value on stack
+4 	subq	$16, %rsp Allocate space for i (%rsp = s1)    // allocate 16 bytes onto stack
+5 	leaq	30(,%rdi,8), %rax  // rax += 8rdi + 30
+6 	andq	$-16, %rax   (30 +8n) & 0XFF...F0
+7 	subq	%rax, %rsp Allocate space for array p (%rsp = s2)
+8 	leaq	15(%rsp), %r8
+9 	andq	$-16, %r8 Set %r8 to &p[0] // start address of p set to value p
+
+A. Explain, in mathematical terms, the logic in the computation of s2.
+   S2 = S1 - (n * 8 + 30) & 16
+   S2 = S1 - (n * 8 + 30) & 0XFF...FF0
+   We arrive at this by following the assembly code through line 6 above. 
+   When you & with -16, it is the equivilent of performing the % operation and then subtracting
+   by the remainder. (round down to nearest multiple of 16)
+B. Explain, in mathematical terms, the logic in the computation of p.
+   P will be equal to the first multiple of 16 > S2
+   P = (S2 + 15) & OXFF...F0
+C. Find values of n and s1 that lead to minimum and maximum values of e1.
+   e1 is space between p and s1, so the value of e1 will be minimized when
+   p aligns to a multiple of 16. For even values of n, n * sizeof long will be 16, 
+   minimizing the the size of e1. 
+   
+D. What alignment properties does this code guarantee for the values of s2 and p?
+   S2 will preserve the offset of s1 to the nearest multiple of 16. So, p will be aligned on a multiple
+   S2 will be a multiple of 16 rounded down from whatever the value of 8 * n yields. P will be aligned to 
+   8 because it is an array of longs which would align to 8. 

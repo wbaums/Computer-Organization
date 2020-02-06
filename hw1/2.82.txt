@@ -1,0 +1,40 @@
+/* Create some arbitrary values */
+int x = random();
+int y = random();
+
+/* Convert to unsigned */
+unsigned ux = (unsigned) x;
+unsigned uy = (unsigned) y;
+
+// A. (x<y) == (-x>-y)                                                                           
+// This expression won't always return 1/true. When x == Tmin. -x will cause overflow            
+// and will remain Tmin, but the y will be greater after it become -y.                           
+
+// B. ((x+y)<<4) + y-x == 17*y+15*x                                                              
+// This will always return 1. The left side is the same as (x<<4) + (y<<4), which equals         
+// x << 4 - x + y << 4 + y. x<<4 ==15*x and y<<4+y == 17*y so the expression will always return 
+// true.                                                                                         
+
+// C. -x+~y+1 == -(x+y)                                                                          
+// This does not always return 1. Take x and y to be 0 for example.                              
+
+// D. (ux-uy) == -(unsigned)(y-x)                                                                
+// This expression will always return 1 because both ux and uy are unsigned. When you cast y-x   
+// to unsigned the bits will stay the same except for for the sign, and the leading negative     
+// won't change the expression because the number is already unsigned.                           
+
+// E. ((x >> 2) << 2) <= x                                                                       
+// This expression will always return 1. When you shift right by two, the bits on the side of    
+// the MSB will stay the same, but the two bits on the right will be zero's after the left shift
+// meaning that the left will be the same or less than it was before the shifts.                 
+
+// F. x % 8 == (x & 7)                                                                           
+// This expression will always return 1. 7 is 0111 , and the posible results of x % 8 are 0 - 7.
+// Anything you & with 0111 will change the bottom for decimals to be the same as the remainder \
+of x mod 8. They are the same operation.                                                         
+
+// G. ((unsigned) -1 / 255 * (x & 255)) >> 24 == (x & 255)                                       
+// This expression will always return 1. 255 in binary is 01111111 (8 bits) and the left side en\
+// ds by right shifting 24. So, the least significant 8 bits of the left side will have been     
+// the previous most significant bits. The most significant bits of the left will be the same as\
+ the on the right, so this will be true. 

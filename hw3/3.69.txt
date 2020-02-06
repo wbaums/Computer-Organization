@@ -1,0 +1,36 @@
+
+typedef struct {
+	int first;
+	a_struct a[CNT];
+	int last;
+} b_struct;
+
+void test(long i, b_struct *bp)
+     {
+	int n = bp->first + bp->last;
+	a_struct *ap = &bp->a[i];
+	ap->x[ap->idk] = n;
+    }
+
+void test(long i, b_struct *bp)
+i in %rdi, bp in %rsi
+0000000000000000 <test>:
+ 0: 8b 8e 20 01 00 00	mov	0x120(%rsi),%ecx	//ecx = (4x64 + 32)*bp
+ 6: 030e     add   (%rsi),%ecx				// first + last
+ 8: 48 8d 04 bf		lea	(%rdi,%rdi,4),%rax	// return = 5 x i
+ c: 48 8d 04 c6			lea	(%rsi,%rax,8),%rax  // return = 40xi + bp 
+ 10: 48 8b 50 08		mov	0x8(%rax),%rdx	    // rdx = 5 * 8 * i
+ 14: 48 63 c9 			movslq	%ecx,%rcx	    // sign extend exc, move into rcx
+ 17: 48 89 4c d0 10		mov	%rcx,0x10(%rax,%rdx,8) // 16 + (bp + ix40 + *) + 8xap
+ 1c: c3	      retq
+
+A. The value of CNT
+   288 total bytes - 8 bytes = 280 bytes. From line 10, we know that each array element in a_struct a = 40 bytes. There are 280 bytes in the array and 40 bytes per element, so we know that there are 7 elements in the array. Therefore CNT = 7.
+   CNT = 7
+B. A complete declaration of structure a_struct. Assume that the only fields in
+this structure are idx and x and that both of these contain signed values.
+     We know from above that each instance of a_struct is 40 bytes long and that it is aligned by 8. So idx is a long and x is a 4 element array of longs. 
+typedef struct {
+	long idx;
+	long x[4];
+} a_struct;
