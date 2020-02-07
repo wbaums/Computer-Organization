@@ -1,0 +1,30 @@
+
+
+_Bool
+  testovf (long n)
+  {
+    return n + 9223372036854775807 < n;
+  }
+
+1)  $ gcc -O2 -S testov.c
+
+testovf:
+.LFB0:
+        .cfi_startproc
+        xorl    %eax, %eax
+        ret
+        .cfi_endproc
+
+2)  $ gcc -O2 -fwrapv -S testov.c
+
+testovf:
+.LFB0:
+        .cfi_startproc
+        movabsq $9223372036854775807, %rax
+        addq    %rdi, %rax
+        cmpq    %rdi, %rax
+        setl    %al
+        ret
+        .cfi_endproc
+
+3)   $ gcc -O2 -fsanitize=undefined -S testov.c

@@ -5,3 +5,44 @@ I begin by running a command to see how emacs can multiply numbers with shell co
   $ emacs -Q -batch -eval '(print (* 1250284240 -1844255039))'
 Which prints:
 2305843008625102544
+
+Next I test the executable:
+     $ ~eggert/bin64/bin/emacs-26.3 -Q -batch -eval '(print (* 1250284240 -1844255039))'
+which correctly prints:
+2305843008625102544
+
+Now I begin generating the commands that will run.
+I start by copying and pasting the bash script commands on Piazza into gen-commands.sh.
+Then I make gen-commands.sh executable and run it, piping the output into
+a text file.
+     $ chmod u+x gen-commands.sh     
+     $ ./gen-commands.sh > gdb-commands.txt
+It looks like this:
+set pagination off
+break Ftimes
+set style enabled off
+run -Q -batch -eval '(print (* 1250284240 -1844255039))'
+set logging on
+set disassemble-next-line on
+stepi
+stepi
+stepi
+....
+
+Now I need to figure out exaclty how to step through the function using gdb. I manually step
+the Ftimes function of data.c and figure out that I need to use stepi 90 times to complete
+the function. I open the file gen-commands.sh and delete the lines creating the step and next
+instructions. I replace the loops with one loop stepping 90 times:
+
+for i in {1..90}
+do
+	echo "stepi"
+done
+
+Now I remake the file gdb-commands.txt and reformat the gdb output:
+
+    $ ./gen-commands.sh > gdb-commands.txt
+    $ grep "=>.*" gdb.txt |sed "s/=> 0x[0]*\(.*\)/\1/p" | sed "s/\([0-9abcdef]\)\s<[^>]*>:\s\(
+    [0-9abcdef ]*\)\s\([^\t]*\)/\1\t\2\t\3/p" > gdb-formatted.txt
+Now I create the trace:
+    $ uniq gdb-formatted.txt | sed 's/  */ /g' > trace.tr
