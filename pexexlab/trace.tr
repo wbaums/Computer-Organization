@@ -1,6 +1,6 @@
 54ddd3	48 89 fe	mov %rdi,%rsi	rsi=2
 54ddd6	bf 02 00 00 00	mov $0x2,%edi	edi=2
-54dddb	e9 a0 fd ff ff	jmpq 0x54db80 <arith_driver>	//jmp to arith_driver
+54dddb	e9 a0 fd ff ff	jmpq 0x54db80 <arith_driver>
 54db80	41 57	push %r15   M8[7fffffffc720]=b630c0 rsp=7fffffffc720
 54db82	41 56	push %r14   M8[0x7fffffffc738]=2 rsp=7fffffffc738
 54db84	49 89 d6	mov %rdx,%r14		 r14=7fffffffc760
@@ -11,7 +11,7 @@
 54db8f	53	push %rbx   M8[7fffffffc718]=0
 54db90	48 83 ec 18	sub $0x18,%rsp	rsp=7fffffffc700
 54db94	83 ff 03	cmp $0x3,%edi	//cmp 3, edi
-54db97	0f 86 bb 00 00 00	jbe 0x54dc58 <arith_driver+216>	//jmp <=
+54db97	0f 86 bb 00 00 00	jbe 0x54dc58 <arith_driver+216>
 54dc58	31 ed	xor %ebp,%ebp	rbp=0 
 54dc5a	83 ff 01	cmp $0x1,%edi
 54dc5d	40 0f 97 c5	seta %bpl	rbp=1
@@ -85,4 +85,3 @@
 54dd0e	41 5e	pop %r14    rsp=7fffffffc740 r14=2
 54dd10	41 5f	pop %r15    rsp=7fffffffc748 r15=b630c0
 54dd12	c3	retq	    rsp=7fffffffc750
-

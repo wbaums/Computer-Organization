@@ -1,6 +1,8 @@
 William Baumbacher
 Pexex lab log
 
+Gathering Traces:
+
 I begin by running a command to see how emacs can multiply numbers with shell commands:
   $ emacs -Q -batch -eval '(print (* 1250284240 -1844255039))'
 Which prints:
@@ -8,7 +10,7 @@ Which prints:
 
 Next I test the executable:
      $ ~eggert/bin64/bin/emacs-26.3 -Q -batch -eval '(print (* 1250284240 -1844255039))'
-which correctly prints:
+which prints:
 2305843008625102544
 
 Now I begin generating the commands that will run.
@@ -47,8 +49,25 @@ Now I remake the file gdb-commands.txt and reformat the gdb output:
     [0-9abcdef ]*\)\s\([^\t]*\)/\1\t\2\t\3/p" > gdb-formatted.txt
 Now I create the trace:
     $ uniq gdb-formatted.txt | sed 's/  */ /g' > trace.tr
+The trace is complete except for the fourth column. So, I use gdb to manually step
+through the function and record the changes in registers and memory. I use the graphical
+interface (gdb) "layout next" which shows me the value of each register and how they change after each
+assembly line. I use the (gdb) stepi command as well as (gdb) x $register to get values as
+needed.
+
+
+____________________________________________________________________________________________
+____________________________________________________________________________________________
+Integer Overflow Handling:
+
+I copy the function into a file testov.c. Then I compile the file with each of the following
+commands in order to understand the differences in compilation.
+
+$ gcc -O2 -S testov.c
+
+
+$ gcc -O2 -fwrapv -S testov.c
 
 
 
-0x4A85D2D0 = 1250284240
-0x9212E6C1 = -1844255039
+$ gcc -O2 -fsanitize=undefined -S testov.c

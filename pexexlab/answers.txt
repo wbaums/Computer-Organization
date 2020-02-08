@@ -1,0 +1,24 @@
+1. Explain why the instructions in the trace did not produce the correct mathematical result. Which instructions caused the problem, exactly?
+   1250284240 * -1844255039 != 2305843008625102544
+   The answer produced is obviously incorrect. There is one positive and one negative operand, but the
+   result was positive. This was likely due to an overflow error somewhere in the code. We find the
+   error to be in the lea instruction:
+   54dcfc  48 8d 04 ad 02 00 00 00 lea 0x2(,%rbp,4),%rax   rax=7fffffff73ab3b42
+   We can see above that the value that we are attempting to store into rax (7fffffff73ab3b42) is the
+   correct value. However, this number is too large to fit into rax and it overflows. Overflow is
+   undefined behavior in emacs, so the computer outputs the wrong answer: 2305843008625102544
+
+2. Explain why the shell command emacs -Q -batch -eval '(print most-negative-fixnum)' outputs -2305843009213693952. Where did the number come from? Explain in terms of the Emacs source code.
+   I navigate to the source code of most-negative-fixnum within data.c to see what the source code says.
+   There is a comment that says: "The smallest value that is representable in a Lisp integer." Lisp
+   integers have no limit imposed on them in terms of size, but there is a point at which numbers are
+   no longer stored efficiently. Numbers that are represented efficiently are called fuxnum while
+   numbers not stored efficiently are called bignum. The numbers that are fixnum vs bignum are
+   dependent on the implementation, but on the x 86-64, it likely has something to do with the fact
+   that it uses 64 bit registers. most-negative-fixnum is -2305843009213693952 because it is the
+   smallest number that can be efficiently represented in Lisp integers on the X 86-64. 
+
+3. Explain why the shell command emacs -Q -batch -eval '(print (* most-positive-fixnum most-positive-fixnum most-positive-fixnum most-positive-fixnum))' outputs only 1.
+   
+
+4. The Emacs executable was compiled with GCC's -O2 option. Suppose it had also been compiled with -fwrapv. Explain any problems Emacs would run into, or if there would not be a problem explain why not.

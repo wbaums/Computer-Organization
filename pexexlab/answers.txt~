@@ -1,0 +1,9 @@
+1. Explain why the instructions in the trace did not produce the correct mathematical result. Which instructions caused the problem, exactly?
+   1250284240 * -1844255039 = 2305843008625102544
+   The answer produced is obviously incorrect. There was one positive and one negative operand, but theresult was positive. 
+
+2. Explain why the shell command emacs -Q -batch -eval '(print most-negative-fixnum)' outputs -2305843009213693952. Where did the number come from? Explain in terms of the Emacs source code.
+
+3. Explain why the shell command emacs -Q -batch -eval '(print (* most-positive-fixnum most-positive-fixnum most-positive-fixnum most-positive-fixnum))' outputs only 1.
+
+4. The Emacs executable was compiled with GCC's -O2 option. Suppose it had also been compiled with -fwrapv. Explain any problems Emacs would run into, or if there would not be a problem explain why not.
