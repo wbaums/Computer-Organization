@@ -62,12 +62,7 @@ Integer Overflow Handling:
 
 I copy the function into a file testov.c. Then I compile the file with each of the following
 commands in order to understand the differences in compilation.
-
-$ gcc -O2 -S testov.c
-
-
-$ gcc -O2 -fwrapv -S testov.c
-
-
-
-$ gcc -O2 -fsanitize=undefined -S testov.c
+$ gcc -O2 -S testovf.c
+$ gcc -O2 -fwrapv -S testovf.c
+$ gcc -O2 -fsanitize=undefined -S testovf.c
+Then I write a discription about what each compilation tag does in the file testovf.txt

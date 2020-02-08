@@ -1,0 +1,81 @@
+Examining integer overfow handling:
+
+_Bool
+testovf (long n)
+{
+   return n + 9223372036854775807 < n;
+}
+
+1)  $ gcc -O2 -S testovf.c
+
+testovf:
+.LFB0:
+        .cfi_startproc
+        xorl    %eax, %eax
+        ret
+        .cfi_endproc
+
+This is compiled with the -O2 tag which is an otptimizing tag. Turning on the optimizer
+flag makes the compiler attempt to improve performance or code size even if it will take
+potentially take longer to compile. The -O specifically, the compiler tries to reduce the
+size and execution time of the code. This code will always return 0, so the compiler does
+not need to use any comparisons. 
+
+
+2)  $ gcc -O2 -fwrapv -S testovf.c
+
+testovf:
+.LFB0:
+        .cfi_startproc
+        movabsq $9223372036854775807, %rax
+        addq    %rdi, %rax
+        cmpq    %rdi, %rax
+        setl    %al
+        ret
+        .cfi_endproc
+
+This is compiled using -O2 but with the addition of the -fwrapv tag. This option tells the compiler
+that arithmatic operations will wrap around in two's complement. Because it wraps around the compiler
+must now add the cmpq instruction because the result may not always evalute to zero. 
+
+
+3)   $ gcc -O2 -fsanitize=undefined -S testovf.c
+
+testovf:
+.LFB0:
+        .cfi_startproc
+        movabsq $9223372036854775807, %rdx
+        pushq   %rbp
+        .cfi_def_cfa_offset 16
+        .cfi_offset 6, -16
+        movq    %rdi, %rbp
+        pushq   %rbx
+        .cfi_def_cfa_offset 24
+        .cfi_offset 3, -24
+        movq    %rdi, %rbx
+        subq    $8, %rsp
+        .cfi_def_cfa_offset 32
+        addq    %rdx, %rbp
+        jo      .L6
+.L2:
+        cmpq    %rbx, %rbp
+        setl    %al
+        addq    $8, %rsp
+        .cfi_remember_state
+        .cfi_def_cfa_offset 24
+        popq    %rbx
+        .cfi_def_cfa_offset 16
+        popq    %rbp
+        .cfi_def_cfa_offset 8
+        ret
+.L6:
+        .cfi_restore_state
+        movq    %rdi, %rsi
+        movl    $.Lubsan_data0, %edi
+        call    __ubsan_handle_add_overflow
+        jmp     .L2
+        .cfi_endproc
+
+This tag removes the -fwrapv tag and adds the -fsanitize=undefined tag. This tag tells the compiler
+to run a series of checks to detect for the possibility of undefined behavior. The compiler
+specifically checks whether or not the addition overflows when adding n + 9223372036854775807. 
