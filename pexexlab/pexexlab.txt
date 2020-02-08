@@ -29,10 +29,11 @@ stepi
 stepi
 ....
 
-Now I need to figure out exaclty how to step through the function using gdb. I manually step
-the Ftimes function of data.c and figure out that I need to use stepi 90 times to complete
-the function. I open the file gen-commands.sh and delete the lines creating the step and next
-instructions. I replace the loops with one loop stepping 90 times:
+Now I need to figure out exaclty how to step through the function using gdb.
+    $ gdb ~eggert/bin64/bin/emacs-26.3
+I manually step the Ftimes function of data.c and figure out that I need to use stepi 90 times
+to complete the function. I open the file gen-commands.sh and delete the lines creating the
+step and next instructions. I replace the loops with one loop stepping 90 times:
 
 for i in {1..90}
 do
@@ -46,3 +47,8 @@ Now I remake the file gdb-commands.txt and reformat the gdb output:
     [0-9abcdef ]*\)\s\([^\t]*\)/\1\t\2\t\3/p" > gdb-formatted.txt
 Now I create the trace:
     $ uniq gdb-formatted.txt | sed 's/  */ /g' > trace.tr
+
+
+
+0x4A85D2D0 = 1250284240
+0x9212E6C1 = -1844255039
