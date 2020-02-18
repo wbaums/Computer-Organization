@@ -1,0 +1,31 @@
+f1:
+.LFB3:
+        .cfi_startproc
+        vfmadd132ss     %xmm1, %xmm2, %xmm0
+        ret
+        .cfi_endproc
+In function f1, the instruction vfmadd132ss is the fused multiply-add of scalar
+single-precision floating-point
+
+f2:
+.LFB4:
+        .cfi_startproc
+        vmulss  %xmm1, %xmm0, %xmm0
+        vaddss  %xmm2, %xmm0, %xmm0
+        ret
+        .cfi_endproc
+Function f2 first uses the command vmulss which multiplies two floating point
+numbers together. Then it calls vaddss which adds single precision floating
+point numbers. Function f1 does the multiply and add in one step and therefore
+only has one rounding operation, while f2 rounds twice - once for the multiply
+and one for the add. This means that because of rounding, f1 and f2 will
+sometimes compute different values, which is why the compiler cannot
+simply use the same assembly code for both functions. 
+
+For the definition of the fmaf function, it says that it "returns (x * y) + z
+rounded as one ternary operation" A ternary operation is used for decision
+making in place of an if/else statement, and it takes the following form:
+condition ? value_if_true : value_if_false
+This means that the value of (x*y)+z is rounded only once when called in f1,
+but in f2, the numbers are rounded twice. Once for the multiplication and once
+for the addition. 
