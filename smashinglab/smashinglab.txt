@@ -1,0 +1,19 @@
+smashinglab.txt log
+
+I begin by copying and pasting the patch in the spec into a new file,
+sthttpd.patch.
+Then I get and unzip the tar file to which the patch applies:
+     $ http://web.cs.ucla.edu/classes/winter20/cs33/lab/sthttpd-2.27.0.tar.gz
+     $ tar -xvf sthttpd-2.27.0.tar.gz
+patching file sthttpd-2.27.0/src/thttpd.c
+patching file sthttpd-2.27.0/src/libhttpd.c
+patch unexpectedly ends in middle of line
+Hunk #1 succeeded at 4078 with fuzz 2.
+
+Then I check my gcc version to make sure that it is the correct one:
+     $ which gcc
+/usr/local/cs/bin/gcc
+which shows me that I am using the correct version.
+
+Now I build it with the patch applied using the the command given in the spec:
+    $ ./configure \ LDFLAGS="-Xlinker --rpath=/usr/local/cs/gcc-$(gcc -dumpversion)/lib"
