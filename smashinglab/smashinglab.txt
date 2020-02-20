@@ -16,4 +16,19 @@ Then I check my gcc version to make sure that it is the correct one:
 which shows me that I am using the correct version.
 
 Now I build it with the patch applied using the the command given in the spec:
-    $ ./configure \ LDFLAGS="-Xlinker --rpath=/usr/local/cs/gcc-$(gcc -dumpversion)/lib"
+    $ ./configure \LDFLAGS="-Xlinker --rpath=/usr/local/cs/gcc-$(gcc -dumpversion)/lib"
+It configures successfully. Now I compile it three times with different
+compiler options:
+(SP) for strong stack protection:
+     $ make clean
+     $ make CFLAGS='-g3 -O2 -fno-inline -fstack-protector-strong'
+     $ mv src/thttpd src/thttpd-sp
+(AS) for address sanitization:
+     $ make clean
+     $ make CFLAGS='-g3 -O2 -fno-inline -fsanitize=address -static-libasan'
+     $ mv src/thttpd src/thttpd-as
+(NO) for neither:
+     $ make clean
+     $ make CFLAGS='-g3 -O2 -fno-inline -fno-stack-protector -zexecstack'
+     $ mv src/thttpd src/thttpd-no
+     
