@@ -1,4 +1,4 @@
-smashinglab.txt log
+smashinglab.txt lab log
 
 I begin by copying and pasting the patch in the spec into a new file,
 sthttpd.patch.
@@ -31,4 +31,228 @@ compiler options:
      $ make clean
      $ make CFLAGS='-g3 -O2 -fno-inline -fno-stack-protector -zexecstack'
      $ mv src/thttpd src/thttpd-no
-     
+These commands succesfully build the three different versions of the program.
+
+Now I run each of the modified sthttpd daemons under GDB on the correct port. First I
+calculate the correct port number for each of the versions:
+
+204915304 % 293	== 187
+12330 + 3 * (X % 293) + Y
+12330 + 3 * (187) + Y
+12330 +	561 + Y
+12891 +	Y
+1=SP, 2=AS, 3=NO
+SP : 12892
+AS : 12893
+NO : 12894
+
+Now I check that the three executables run. I use the following commands to create
+the servers. (each in a separate window):
+    $ src/thttpd-sp -p 12892 -D
+    $ src/thttpd-as -p 12893 -D
+    $ src/thttpd-no -p 12894 -D
+I log onto seasnet in new windows and test that the files work. I create a file
+foo.txt and write the following message:
+	Testing that web servers work in normal case.
+Then I test the servers:
+     $ curl http://localhost:12892/foo.txt
+     $ curl http://localhost:12893/foo.txt
+     $ curl http://localhost:12894/foo.txt
+
+Each of these tests outputs the message in foo.txt:
+     Testing that web servers work in normal case.
+Therefore the servers are working under the normal case.
+
+Now we want to try to make the servers crash. First with variant SP, I try to pass
+a file that is too large. To do this, I copy and paste my previous message over and
+over. I copy and paste the previous message 50 times. 
+This is not large enough and it prints the message:
+     "Testing tha web servers work in normal case."
+50 times.
+
+I check the patch file again and it says that it changed the char line[10000] to
+char line[100]. I might have been crating new lines previously so now I make foo.txt
+one continuous string of characters that is greater than 100 lines. 
+I test it in gdb:
+
+
+
+Too make variant sp crash, I try passing in a file that is too large. In foo.txt I
+write over 300 'a' characters:
+port=aaaaaaaaaaaa....
+  $ gdb src/thttpd-sp
+  (gdb) r -p 12892 -D -C foo.txt
+This outputs:
+
+ttpd-2.27.0/src/thttpd-sp terminated
+Program received signal SIGSEGV, Segmentation fault.
+0x00007ffff6da40b8 in ?? () from /lib64/libgcc_s.so.1
+
+Now I backtrace so I can see what exactly caused the program to crash:
+    (gdb) backtrace
+
+#0  0x00007ffff6da40b8 in ?? () from /lib64/libgcc_s.so.1
+#1  0x00007ffff6da4fb9 in _Unwind_Backtrace () from /lib64/libgcc_s.so.1
+#2  0x00007ffff76e2a96 in backtrace () from /lib64/libc.so.6
+#3  0x00007ffff7646ee4 in __libc_message () from /lib64/libc.so.6
+#4  0x00007ffff76e6567 in __fortify_fail () from /lib64/libc.so.6
+#5  0x00007ffff76e6522 in __stack_chk_fail () from /lib64/libc.so.6
+#6  0x0000000000404155 in read_config (filename=<optimized out>) at thttpd.c:1129
+#7  0x6161616161616161 in ?? ()
+#8  0x6161616161616161 in ?? ()
+#9  0x6161616161616161 in ?? ()
+
+    (gdb) disassemble 0x40413c, 0x404158
+
+0x000000000040413c <read_config+1388>:	mov    %r14,%rdi
+   0x000000000040413f <read_config+1391>:	callq  0x403b80 <e_strdup>
+   0x0000000000404144 <read_config+1396>:	mov    %rax,0x212e3d(%rip)        # 0x616f88 <hostname>
+   0x000000000040414b <read_config+1403>:	jmpq   0x403f25 <read_config+853>
+   0x0000000000404150 <read_config+1408>:	callq  0x402410 <__stack_chk_fail@plt>
+   0x0000000000404155 <read_config+1413>:	nopl   (%rax)
+
+I need a closer look to see the problem so I rerun the program in gdb and set a break
+at read_config
+   (gdb) break read_config
+   (gdb) set disassemble-next-line on
+I step through the program until I get to:
+
+*** stack smashing detected ***: /w/home.20/class/classwba/Documents/33/smashinglab/sthttpd-2.27.0/src/thttpd-sp terminated
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00007ffff6da40b8 in ?? () from /lib64/libgcc_s.so.1
+=> 0x00007ffff6da40b8:	80 39 48	cmpb   $0x48,(%rcx)
+
+I look above to figure out what may have caused the crash and find the following lines:
+
+0x000000000040403d <read_config+1133>:	48 8b 44 24 68	mov    0x68(%rsp),%rax
+   0x0000000000404042 <read_config+1138>:	64 48 33 04 25 28 00 00 00	xor    %fs:0x28,%rax
+   0x000000000040404b <read_config+1147>:	0f 85 ff 00 00 00	jne    0x404150 <read_config+1408>
+
+This program crashed because it used a canary, and when I input a file that was too
+large it was overwritten. Then when the program compared to make sure no overflow had
+happened it found that there was overflow and crashed the program for safety.
+
+
+After making variant sp crash, we now want to do the same for variant AS:
+
+   $ gdb src/thttpd-as
+   (gdb) r -p 12893 -D -C foo.txt
+
+==3126==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7fffffffcc24 at pc 0x00000043760b bp 0x7fffffffcb70 sp 0x7fffffffc320
+WRITE of size 343 at 0x7fffffffcc24 thread T0
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00007ffff70730b8 in ?? () from /lib64/libgcc_s.so.1
+
+    (gdb) backtrace
+
+
+#0  0x00007ffff70730b8 in ?? () from /lib64/libgcc_s.so.1
+#1  0x00007ffff7073fb9 in _Unwind_Backtrace () from /lib64/libgcc_s.so.1
+#2  0x0000000000513c50 in __sanitizer::BufferedStackTrace::SlowUnwindStack (
+    this=0x7fffffffadf0, pc=4421131, max_depth=<optimized out>)
+    at ../../../../gcc-9.2.0/libsanitizer/sanitizer_common/sanitizer_unwind_linux_libcdep.cc:125
+#3  0x00000000004177b7 in __asan::GetStackTrace (fast=false, context=0x0, bp=140737488341872, 
+    pc=4421131, max_depth=256, stack=0x7fffffffadf0)
+    at ../../../../gcc-9.2.0/libsanitizer/asan/asan_stack.h:45
+#4  __asan::ErrorGeneric::Print (
+    this=this@entry=0x7b3888 <__asan::ScopedInErrorReport::current_error_+8>)
+    at ../../../../gcc-9.2.0/libsanitizer/asan/asan_errors.cc:571
+#5  0x00000000004f618d in __asan::ErrorDescription::Print (
+    this=0x7b3880 <__asan::ScopedInErrorReport::current_error_>)
+    at ../../../../gcc-9.2.0/libsanitizer/asan/asan_errors.h:420
+#6  __asan::ScopedInErrorReport::~ScopedInErrorReport (this=0x7fffffffb6a6, 
+    __in_chrg=<optimized out>) at ../../../../gcc-9.2.0/libsanitizer/asan/asan_report.cc:140
+#7  0x00000000004f5b50 in __asan::ReportGenericError (pc=4421131, bp=bp@entry=140737488341872, 
+    sp=sp@entry=140737488339744, addr=addr@entry=140737488342052, is_write=is_write@entry=true, 
+    access_size=access_size@entry=343, exp=0, fatal=false)
+    at ../../../../gcc-9.2.0/libsanitizer/asan/asan_report.cc:192
+#8  0x000000000043762d in __interceptor_fgets (s=<optimized out>, size=<optimized out>, 
+    file=<optimized out>)
+    at ../../../../gcc-9.2.0/libsanitizer/sanitizer_common/sanitizer_common_interceptors.inc:1200
+--Type <RET> for more, q to quit, c to continue without paging--
+#9  0x000000000052b46f in read_config (filename=<optimized out>) at thttpd.c:1015
+#10 0x6161616161616161 in ?? ()
+#11 0x6161616161616161 in ?? ()
+#12 0x6161616161616161 in ?? ()
+
+Again the problem is in read_config, so we re-run the prgram and set a break as we
+did previously
+    $ gdb src/thttpd-as
+    (gdb) break read_config
+    (gdb) r -p 12893 -D -C foo.txt
+    (gdb) set disassemble-next-line on
+
+Stepping through we get:
+
+0x000000000052b433 <read_config+115>:	c7 80 14 80 ff 7f f3 f3 f3 f3	movl   $0xf3f3f3f3,0x7fff8014(%rax)
+   0x000000000052b43d <read_config+125>:	e8 ae 40 f3 ff	callq  0x45f4f0 <__interceptor_fopen(char const*, char const*)>
+   0x000000000052b442 <read_config+130>:	48 89 04 24	mov    %rax,(%rsp)
+(gdb) n
+1009	    if ( fp == (FILE*) 0 )
+=> 0x000000000052b446 <read_config+134>:	48 85 c0	test   %rax,%rax
+   0x000000000052b449 <read_config+137>:	0f 84 db 07 00 00	je     0x52bc2a <read_config+2154>
+
+The program calls the function__interceptor_fopen and then runs a test command based
+on that program. Then it jumps, which is why the program crashes.
+
+EXPLAIN THIS MORE
+
+Now we do the same for variant NO:
+
+    $ gdb src/thttpd-no
+    (gdb) r -p 12894 -D -C foo.txt
+
+Using host libthread_db library "/lib64/libthread_db.so.1".
+
+Program received signal SIGSEGV, Segmentation fault.
+0x0000000000403f69 in read_config (filename=<optimized out>) at thttpd.c:1189
+1189	    (void) fclose( fp );
+
+I follow the same process as for the other variants:
+    (gdb) backtrace
+
+#0  0x0000000000403f69 in read_config (filename=<optimized out>) at thttpd.c:1189
+#1  0x6161616161616161 in ?? ()
+#2  0x6161616161616161 in ?? ()
+....
+
+The problem is in read_config again.
+    $ gdb src/thttpd-no
+    (gdb) break read_config
+    (gdb) r -p 12894 -D -C foo.txt
+    (gdb) set disassemble-next-line on
+Now I step through.
+Once the program reaches the Segmentation fault I look at the previous lines:
+
+   0x0000000000403f55 <read_config+1109>:       4c 89 ef        mov    %r13,%rdi
+   0x0000000000403f58 <read_config+1112>:       e8 d3 e3 ff ff  callq  0x402330 <fclose@plt>
+   0x0000000000403f5d <read_config+1117>:       48 83 c4 70     add    $0x70,%rsp
+   0x0000000000403f61 <read_config+1121>:       5b      pop    %rbx
+   0x0000000000403f62 <read_config+1122>:       5d      pop    %rbp
+   0x0000000000403f63 <read_config+1123>:       41 5c   pop    %r12
+   0x0000000000403f65 <read_config+1125>:       41 5d   pop    %r13
+   0x0000000000403f67 <read_config+1127>:       41 5e   pop    %r14
+=> 0x0000000000403f69 <read_config+1129>:       c3      retq
+
+There is no obvious reason for the program to have failed in this case. Different from
+the other two programs, this variant was compiled using -zexecstack meaning that the
+program does not check buffer overflow. There is no function to do so in this variant.
+Therefore all of the code runs, and when the program tries to return, the address has
+been overwritten. The program tries to return anyway to the overwritten address, but
+the address does not exist and a segmentation fault occurs. 
+
+
+Now I generate the assembly code for thttpd.c three times, one for each variant. I start by
+configuring again:
+    $ ./configure \LDFLAGS="-Xlinker --rpath=/usr/local/cs/gcc-$(gcc -dumpversion)/lib"
+    $ make clean
+First version:
+    $ gcc -S -O2 -fno-inline -fstack-protector-strong -I .. -I . thttpd.c -o thttpd-sp.s
+It worked, second version:
+    $ make clean
+    $ gcc -S -O2 -fno-inline -static-libasan -fsanitize=address -I .. -I . thttpd.c -o thttpd-as.s
+Third version:
+    $ make clean
+    $ gcc -S -O2 -fno-inline -fno-stack-protector -zexecstack -I .. -I . thttpd.c -o thttpd-no.s
